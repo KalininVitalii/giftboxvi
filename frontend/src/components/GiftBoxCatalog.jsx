@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, Search, User, Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -17,42 +17,55 @@ const GiftBoxCatalog = () => {
   const { toast } = useToast();
   const { cart, addToCart, updateQuantity, removeFromCart, clearCart, getCartItemCount } = useCart();
 
-  const toggleWishlist = (productId) => {
-    if (wishlist.includes(productId)) {
-      setWishlist(wishlist.filter(id => id !== productId));
-      toast({
-        title: "Removed from Wishlist",
-        description: "Item has been removed from your wishlist.",
-        variant: "default",
-      });
-    } else {
-      setWishlist([...wishlist, productId]);
-      toast({
-        title: "Added to Wishlist!",
-        description: "Item has been added to your wishlist.",
-        variant: "default",
-      });
-    }
-  };
+  // Memoize cart item count
+  const cartItemCount = useMemo(() => getCartItemCount(), [cart, getCartItemCount]);
 
-  const handleCheckout = () => {
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Memoize subtotal calculation
+  const subtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+    [cart]
+  );
+
+  // Memoize wishlist toggle
+  const toggleWishlist = useCallback((productId) => {
+    setWishlist((prevWishlist) => {
+      if (prevWishlist.includes(productId)) {
+        toast({
+          title: "Removed from Wishlist",
+          description: "Item has been removed from your wishlist.",
+          variant: "default",
+        });
+        return prevWishlist.filter(id => id !== productId);
+      } else {
+        toast({
+          title: "Added to Wishlist!",
+          description: "Item has been added to your wishlist.",
+          variant: "default",
+        });
+        return [...prevWishlist, productId];
+      }
+    });
+  }, [toast]);
+
+  // Memoize checkout handler
+  const handleCheckout = useCallback(() => {
     const tax = subtotal * 0.13;
     const grandTotal = subtotal + tax;
-    
+
     toast({
       title: "Order Placed Successfully! 🎉",
       description: `Thank you! Your order totaling $${grandTotal.toFixed(2)} has been placed. You'll receive a confirmation email shortly.`,
       variant: "default",
     });
-    
+
     clearCart();
     setIsCartOpen(false);
-  };
+  }, [subtotal, toast, clearCart]);
 
-  const handleProductClick = (productId) => {
+  // Memoize product click handler
+  const handleProductClick = useCallback((productId) => {
     navigate(`/product/${productId}`);
-  };
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-color--accent--coconut to-white">
@@ -171,16 +184,17 @@ const GiftBoxCatalog = () => {
         {/* Product Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {mockProducts.map((product) => (
-            <Card 
-              key={product.id} 
+            <Card
+              key={product.id}
               className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-color--accent--line cursor-pointer"
               onClick={() => handleProductClick(product.id)}
             >
               <CardHeader className="p-0 relative overflow-hidden">
                 <div className="aspect-square relative">
-                  <img 
-                    src={product.images[0]} 
+                  <img
+                    src={product.images[0]}
                     alt={product.name}
+                    loading="lazy" // Lazy load images
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   {product.originalPrice && (
@@ -346,7 +360,7 @@ const GiftBoxCatalog = () => {
       </footer>
 
       {/* Cart Modal */}
-      <CartModal 
+      <CartModal
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         cartItems={cart}
